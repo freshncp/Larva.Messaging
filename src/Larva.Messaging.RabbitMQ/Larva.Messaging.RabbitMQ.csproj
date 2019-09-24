@@ -21,7 +21,7 @@
 - 引入发送和处理的C#事件，方便业务端处理；
 - 消费端消费失败，且OnMessageHandlingFailed事件处理失败时，利用rabbitmq的DLX特性，丢到一个DLX Exchange（使用默认Exchange）中，DLX Exchange发送的队列的命名=Exchange名 + "-dlx"，发布订阅模式需要手工建；
 </Description>
-    <PackageVersion>1.0.0</PackageVersion>
+    <PackageVersion>1.0.2</PackageVersion>
     <NeutralLanguage>zh-CN</NeutralLanguage>
     <Summary>基于RabbitMQ的消息处理，支持专题模式、发布订阅模式和Rpc模式</Summary>
     <Owners>Jerry Bai (QQ:407547953)</Owners>

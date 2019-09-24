@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackOnBuild>true</PackOnBuild>
-    <PackageVersion>1.0.0</PackageVersion>
+    <PackageVersion>1.0.2</PackageVersion>
     <Authors>Jerry Bai (QQ:407547953)</Authors>
     <Copyright>freshncp</Copyright>
     <PackageLicenseUrl>https://github.com/freshncp/Larva.Messaging/blob/master/LICENSE</PackageLicenseUrl>
