@@ -11,6 +11,20 @@
 - 引入发送和处理的C#事件，方便业务端处理；
 - 消费端消费失败，且OnMessageHandlingFailed事件处理失败时，利用rabbitmq的DLX特性，丢到一个DLX Exchange（使用默认Exchange）中，DLX Exchange发送的队列的命名=Exchange名 + "-dlx"，发布订阅模式需要手工建；
 
+
+## 安装Nuget包
+
+```
+Install-Package Larva.Messaging.RabbitMQ
+```
+
+如果是在独立类库上的消息类，标记MessageType，则仅需安装此nuget包
+
+```
+Install-Package Larva.Messaging
+```
+
+
 ## 调用示例
 
 - 定义消息
