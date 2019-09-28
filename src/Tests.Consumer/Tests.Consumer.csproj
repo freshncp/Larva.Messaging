@@ -11,7 +11,4 @@
     <ProjectReference Include="..\Larva.Messaging\Larva.Messaging.csproj" />
     <ProjectReference Include="..\Larva.Messaging.RabbitMQ\Larva.Messaging.RabbitMQ.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Remove="Program.cs" />
-  </ItemGroup>
 </Project>

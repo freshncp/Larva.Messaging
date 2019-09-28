@@ -1,4 +1,4 @@
-﻿using KedeGroup.Messaging;
+﻿using Larva.Messaging;
 using System;
 
 namespace Tests.Messages
