@@ -42,12 +42,17 @@ namespace Larva.Messaging.RabbitMQ
             , ushort parallelDegree = 4, ISerializer serializer = null, int maxRetryCount = 1, bool disableQueuePrefix = false, bool debugEnabled = false)
             : base(serializer, maxRetryCount, debugEnabled)
         {
-            _conn = conn ?? throw new ArgumentNullException("conn");
+            _conn = conn ?? throw new ArgumentNullException(nameof(conn));
             if (methodNames == null || !methodNames.Any())
             {
-                throw new ArgumentNullException("methodNames");
+                throw new ArgumentNullException(nameof(methodNames));
+            }
+            if (string.IsNullOrEmpty(exchangeName))
+            {
+                throw new ArgumentNullException(nameof(exchangeName), "must not empty");
             }
             MethodNameList = new List<string>(methodNames).AsReadOnly();
+            ExchangeName = exchangeName;
             _consumers = new ConcurrentDictionary<string, List<EventingBasicConsumer>>();
             if (parallelDegree == 0)
             {
@@ -69,7 +74,7 @@ namespace Larva.Messaging.RabbitMQ
 
                 foreach (var methodName in MethodNameList)
                 {
-                    var queueName = _disableQueuePrefix ? methodName : $"rpc.{methodName}";
+                    var queueName = _disableQueuePrefix ? methodName : $"{exchangeName}.{methodName}";
                     var callbackQueueName = $"{queueName}.callback";
                     var dlxQueueName = $"{queueName}-dlx";
                     var dlxMessageTTL = 604800000;// 1周过期
@@ -95,7 +100,7 @@ namespace Larva.Messaging.RabbitMQ
             _channels = new Dictionary<string, List<IModel>>(MethodNameList.Count);
             foreach (var methodName in MethodNameList)
             {
-                var queueName = _disableQueuePrefix ? methodName : $"rpc.{methodName}";
+                var queueName = _disableQueuePrefix ? methodName : $"{exchangeName}.{methodName}";
                 var channelList = new List<IModel>();
                 for (var i = 0; i < _parallelDegree; i++)
                 {
@@ -111,6 +116,11 @@ namespace Larva.Messaging.RabbitMQ
                 Dispose();
             };
         }
+
+        /// <summary>
+        /// 交换器
+        /// </summary>
+        public string ExchangeName { get; private set; }
 
         /// <summary>
         /// 方法名列表
@@ -134,7 +144,7 @@ namespace Larva.Messaging.RabbitMQ
             var exceptionList = new List<Exception>();
             foreach (var methodName in MethodNameList)
             {
-                var queueName = _disableQueuePrefix ? methodName : $"rpc.{methodName}";
+                var queueName = _disableQueuePrefix ? methodName : $"{ExchangeName}.{methodName}";
                 var callbackQueueName = $"{queueName}.callback";
                 var channelList = _channels[methodName];
                 _consumers.TryGetValue(queueName, out List<EventingBasicConsumer> consumers);
@@ -157,7 +167,7 @@ namespace Larva.Messaging.RabbitMQ
                                 Thread.Sleep(1000);
                             }
                             var currentMethodName = _channels.First(w => w.Value.Contains(currentChannel)).Key;
-                            var currentQueueName = _disableQueuePrefix ? currentMethodName : $"rpc.{currentMethodName}";
+                            var currentQueueName = _disableQueuePrefix ? currentMethodName : $"{ExchangeName}.{currentMethodName}";
                             HandleMessage(currentConsumer, e.BasicProperties, e.Exchange, currentQueueName, e.RoutingKey, e.Body, e.DeliveryTag, e.Redelivered, false);
                         };
 
@@ -170,8 +180,8 @@ namespace Larva.Messaging.RabbitMQ
                                 Thread.Sleep(1000);
                             }
                             var currentMethodName = _channels.First(w => w.Value.Contains(currentChannel)).Key;
-                            var currentQueueName = _disableQueuePrefix ? currentMethodName : $"rpc.{currentMethodName}";
-                            _logger.Warn($"RpcServer.Consumer.Shutdown: QueueName={currentQueueName}, ChannelIsOpen={currentChannel.IsOpen}, Initiator={e.Initiator}, ClassId={e.ClassId}, MethodId={e.MethodId}, ReplyCode={e.ReplyCode}, ReplyText={e.ReplyText}");
+                            var currentQueueName = _disableQueuePrefix ? currentMethodName : $"{ExchangeName}.{currentMethodName}";
+                            _logger.Warn($"RpcServer.Consumer.Shutdown: ExchangeName={ExchangeName}, QueueName={currentQueueName}, ChannelIsOpen={currentChannel.IsOpen}, Initiator={e.Initiator}, ClassId={e.ClassId}, MethodId={e.MethodId}, ReplyCode={e.ReplyCode}, ReplyText={e.ReplyText}");
                             while (RabbitMQExceptionHelper.IsChannelError(e.ReplyCode) && !currentChannel.IsOpen)
                             {
                                 Thread.Sleep(1000);

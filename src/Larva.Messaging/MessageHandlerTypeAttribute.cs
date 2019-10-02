@@ -27,10 +27,10 @@ namespace Larva.Messaging
         /// <returns></returns>
         public static string GetTypeName(Type messageHandlerType)
         {
-            if (messageHandlerType.IsInterface || messageHandlerType.IsAbstract || messageHandlerType.IsGenericType) return string.Empty;
-            if (!messageHandlerType.GetInterfaces().Any(m => m.IsGenericType && !m.IsGenericTypeDefinition && m.GetGenericTypeDefinition() == typeof(IMessageHandler<>))) return string.Empty;
+            if (messageHandlerType.GetTypeInfo().IsInterface || messageHandlerType.GetTypeInfo().IsAbstract || messageHandlerType.GetTypeInfo().IsGenericType) return string.Empty;
+            if (!messageHandlerType.GetTypeInfo().GetInterfaces().Any(m => m.GetTypeInfo().IsGenericType && !m.GetTypeInfo().IsGenericTypeDefinition && m.GetGenericTypeDefinition() == typeof(IMessageHandler<>))) return string.Empty;
 
-            var messageHandlerTypeAttr = messageHandlerType.GetCustomAttribute<MessageHandlerTypeAttribute>(false);
+            var messageHandlerTypeAttr = messageHandlerType.GetTypeInfo().GetCustomAttribute<MessageHandlerTypeAttribute>(false);
             return messageHandlerTypeAttr != null && !string.IsNullOrWhiteSpace(messageHandlerTypeAttr.TypeName) ? messageHandlerTypeAttr.TypeName.Trim() : messageHandlerType.FullName;
         }
 
@@ -41,11 +41,22 @@ namespace Larva.Messaging
         /// <returns></returns>
         public static string GetCategory(Type messageHandlerType)
         {
-            if (messageHandlerType.IsInterface || messageHandlerType.IsAbstract || messageHandlerType.IsGenericType) return string.Empty;
-            if(!messageHandlerType.GetInterfaces().Any(m => m.IsGenericType && !m.IsGenericTypeDefinition && m.GetGenericTypeDefinition() == typeof(IMessageHandler<>))) return string.Empty;
+            if (messageHandlerType.GetTypeInfo().IsInterface
+                || messageHandlerType.GetTypeInfo().IsAbstract
+                || messageHandlerType.GetTypeInfo().IsGenericType)
+            {
+                return string.Empty;
+            }
+            if (!messageHandlerType.GetTypeInfo().GetInterfaces().Any(m => m.GetTypeInfo().IsGenericType
+                && !m.GetTypeInfo().IsGenericTypeDefinition
+                && m.GetGenericTypeDefinition() == typeof(IMessageHandler<>)))
+            {
+                return string.Empty;
+            }
 
-            var messageHandlerTypeAttr = messageHandlerType.GetCustomAttribute<MessageHandlerTypeAttribute>(false);
-            return messageHandlerTypeAttr != null && !string.IsNullOrWhiteSpace(messageHandlerTypeAttr.Category) ? messageHandlerTypeAttr.Category.Trim() : string.Empty;
+            var messageHandlerTypeAttr = messageHandlerType.GetTypeInfo().GetCustomAttribute<MessageHandlerTypeAttribute>(false);
+            return messageHandlerTypeAttr != null && !string.IsNullOrWhiteSpace(messageHandlerTypeAttr.Category)
+                ? messageHandlerTypeAttr.Category.Trim() : string.Empty;
         }
     }
 }

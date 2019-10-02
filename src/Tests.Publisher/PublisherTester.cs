@@ -9,7 +9,7 @@ using Tests.Messages;
 
 namespace Tests.Publisher
 {
-    public class PublisherTester
+    public class PublisherTester : IDisposable
     {
         private Connection _conn;
         private Random random = new Random(DateTime.Now.Millisecond);
@@ -17,6 +17,11 @@ namespace Tests.Publisher
         public PublisherTester()
         {
             _conn = new Connection(new ConnectionConfig(new Uri("amqp://test:123456@localhost:5672/test")));
+        }
+
+        public void Dispose()
+        {
+            _conn.Close();
         }
 
         public void TestTopic()
@@ -32,11 +37,13 @@ namespace Tests.Publisher
             };
             publisher.OnMessageSendingSucceeded += (sender, e) =>
             {
-                sentMessageDict.AddOrUpdate(e.Context.GetMessageId(), new Tuple<bool, IMessageTransportationContext>(true, e.Context), (key, originVal) => new Tuple<bool, IMessageTransportationContext>(true, originVal.Item2));
+                sentMessageDict.TryRemove(e.Context.GetMessageId(), out Tuple<bool, IMessageTransportationContext> _);
             };
             int sendSequence = 0;
+            Console.WriteLine($"{nameof(TestTopic)} start");
             while (true)
             {
+                Thread.Sleep(10);
                 try
                 {
                     sendSequence++;
@@ -64,7 +71,7 @@ namespace Tests.Publisher
                 {
                     Console.WriteLine($"{ex.GetType().FullName}");
                 }
-                if (sendSequence == 10000000)
+                if (sendSequence == 10000)
                 {
                     Thread.Sleep(3000);
                     Task.Run(() =>
@@ -76,7 +83,7 @@ namespace Tests.Publisher
             }
             var timeout = sendSequence / 10;
             var executeSeconds = 0;
-            while (sentMessageDict.Count != sendSequence || sentMessageDict.Values.Any(w => !w.Item1 && w.Item2.LastException == null))
+            while (sentMessageDict.Count > 0)
             {
                 if (executeSeconds > timeout)
                 {
@@ -85,7 +92,8 @@ namespace Tests.Publisher
                 Thread.Sleep(1000);
                 executeSeconds++;
             }
-            var failList = sentMessageDict.Values.Where(w => !w.Item1).ToList();
+            var failList = sentMessageDict.Values.ToList();
+            Console.WriteLine($"{nameof(TestTopic)} send fail count: {failList.Count}, total: {sendSequence}");
         }
 
         public void TestPubsub()
@@ -100,11 +108,13 @@ namespace Tests.Publisher
             };
             publisher.OnMessageSendingSucceeded += (sender, e) =>
             {
-                sentMessageDict.AddOrUpdate(e.Context.GetMessageId(), new Tuple<bool, IMessageTransportationContext>(true, e.Context), (key, originVal) => new Tuple<bool, IMessageTransportationContext>(true, originVal.Item2));
+                sentMessageDict.TryRemove(e.Context.GetMessageId(), out Tuple<bool, IMessageTransportationContext> _);
             };
             int sendSequence = 0;
+            Console.WriteLine($"{nameof(TestPubsub)} start");
             while (true)
             {
+                Thread.Sleep(10);
                 try
                 {
                     sendSequence++;
@@ -116,20 +126,18 @@ namespace Tests.Publisher
                         };
                         Envelope envelopedMessage = Envelope.Create(message, $"{message.HostingFilialeId}_{Guid.NewGuid()}");
                         Task.Run(() => publisher.SendMessage(envelopedMessage));
-                        Console.WriteLine($"{sendSequence}. send Message01 sequence={message.Sequence} ");
                     }
                     else
                     {
                         var message = new Message02(new Guid("7AE62AF0-EB1F-49C6-8FD1-128D77C84698"));
                         Task.Run(() => publisher.SendMessage(Envelope.Create(message, $"{message.SaleFilialeId}")));
-                        Console.WriteLine($"{sendSequence}. send Message02 no sequence");
                     }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"{ex.Message}");
                 }
-                if (sendSequence == 1000000)
+                if (sendSequence == 10000)
                 {
                     Thread.Sleep(3000);
                     Task.Run(() =>
@@ -141,7 +149,7 @@ namespace Tests.Publisher
             }
             var timeout = sendSequence / 10;
             var executeSeconds = 0;
-            while (sentMessageDict.Count != sendSequence || sentMessageDict.Values.Any(w => !w.Item1 && w.Item2.LastException == null))
+            while (sentMessageDict.Count > 0)
             {
                 if (executeSeconds > timeout)
                 {
@@ -150,15 +158,16 @@ namespace Tests.Publisher
                 Thread.Sleep(1000);
                 executeSeconds++;
             }
-            var failList = sentMessageDict.Values.Where(w => !w.Item1).ToList();
+            var failList = sentMessageDict.Values.ToList();
+            Console.WriteLine($"{nameof(TestPubsub)} send fail count: {failList.Count}, total: {sendSequence}");
         }
 
         public void TestPubsub2()
         {
-            var exchangeName = "test.pubsub";
+            var exchangeName = "test.pubsub2";
             var subscriberNames = new string[] { "wms", "erp" };
             byte queueCount = 2;
-            IPubsubSender publisher = new PubsubSender(_conn, exchangeName, subscriberNames, publishToExchange: true, publishToExchangeQueueCount: queueCount, debugEnabled: true);
+            IPubsubSender publisher = new PubsubSender(_conn, exchangeName, subscriberNames, confirmEnabled: true, atLeastMatchOneQueue: true, publishToExchange: true, publishToExchangeQueueCount: queueCount, debugEnabled: true);
             var sentMessageDict = new ConcurrentDictionary<string, Tuple<bool, IMessageTransportationContext>>();
             publisher.OnMessageSent += (sender, e) =>
             {
@@ -166,15 +175,17 @@ namespace Tests.Publisher
             };
             publisher.OnMessageSendingSucceeded += (sender, e) =>
             {
-                sentMessageDict.AddOrUpdate(e.Context.GetMessageId(), new Tuple<bool, IMessageTransportationContext>(true, e.Context), (key, originVal) => new Tuple<bool, IMessageTransportationContext>(true, originVal.Item2));
+                sentMessageDict.TryRemove(e.Context.GetMessageId(), out Tuple<bool, IMessageTransportationContext> _);
             };
             foreach (var subscriberName in publisher.SubscriberNameQueueOrExchangeNameMapping.Keys)
             {
                 var topicPublisher = new TopicSender(_conn, publisher.SubscriberNameQueueOrExchangeNameMapping[subscriberName], queueCount, sourceExchangeName: publisher.ExchangeName);
             }
             int sendSequence = 0;
+            Console.WriteLine($"{nameof(TestPubsub2)} start");
             while (true)
             {
+                Thread.Sleep(10);
                 try
                 {
                     sendSequence++;
@@ -186,20 +197,18 @@ namespace Tests.Publisher
                         };
                         Envelope envelopedMessage = Envelope.Create(message, $"{message.HostingFilialeId}_{Guid.NewGuid()}");
                         Task.Run(() => publisher.SendMessage(envelopedMessage));
-                        Console.WriteLine($"{sendSequence}. send Message01 sequence={message.Sequence} ");
                     }
                     else
                     {
                         var message = new Message02(new Guid("7AE62AF0-EB1F-49C6-8FD1-128D77C84698"));
                         Task.Run(() => publisher.SendMessage(Envelope.Create(message, $"{message.SaleFilialeId}")));
-                        Console.WriteLine($"{sendSequence}. send Message02 no sequence");
                     }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"{ex.Message}");
                 }
-                if (sendSequence == 1000)
+                if (sendSequence == 10000)
                 {
                     Thread.Sleep(3000);
                     Task.Run(() =>
@@ -211,7 +220,7 @@ namespace Tests.Publisher
             }
             var timeout = sendSequence / 10;
             var executeSeconds = 0;
-            while (sentMessageDict.Count != sendSequence || sentMessageDict.Values.Any(w => !w.Item1 && w.Item2.LastException == null))
+            while (sentMessageDict.Count > 0)
             {
                 if (executeSeconds > timeout)
                 {
@@ -220,7 +229,8 @@ namespace Tests.Publisher
                 Thread.Sleep(1000);
                 executeSeconds++;
             }
-            var failList = sentMessageDict.Values.Where(w => !w.Item1).ToList();
+            var failList = sentMessageDict.Values.ToList();
+            Console.WriteLine($"{nameof(TestPubsub2)} send fail count: {failList.Count}, total: {sendSequence}");
         }
 
         public void TestRpcClient()
@@ -233,11 +243,13 @@ namespace Tests.Publisher
             };
             publisher.OnMessageSendingSucceeded += (sender, e) =>
             {
-                sentMessageDict.AddOrUpdate(e.Context.GetMessageId(), new Tuple<bool, IMessageTransportationContext>(true, e.Context), (key, originVal) => new Tuple<bool, IMessageTransportationContext>(true, originVal.Item2));
+                sentMessageDict.TryRemove(e.Context.GetMessageId(), out Tuple<bool, IMessageTransportationContext> _);
             };
             int sendSequence = 0;
+            Console.WriteLine($"{nameof(TestRpcClient)} start");
             while (true)
             {
+                Thread.Sleep(10);
                 try
                 {
                     sendSequence++;
@@ -249,20 +261,18 @@ namespace Tests.Publisher
                         };
                         var envelopedMessage = Envelope.Create(message);
                         publisher.SendRequest(envelopedMessage, "method1", envelopedMessage.MessageId);
-                        Console.WriteLine($"{sendSequence}. send Message01 sequence={message.Sequence} ");
                     }
                     else
                     {
                         var message = new Message02(new Guid("7AE62AF0-EB1F-49C6-8FD1-128D77C84698"));
                         publisher.SendRequest(Envelope.Create(message), "method2", Guid.NewGuid().ToString());
-                        Console.WriteLine($"{sendSequence}. send Message02 no sequence");
                     }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"{ex.Message}");
                 }
-                if (sendSequence == 1000000)
+                if (sendSequence == 10000)
                 {
                     Thread.Sleep(3000);
                     Task.Run(() =>
@@ -274,7 +284,7 @@ namespace Tests.Publisher
             }
             var timeout = sendSequence / 10;
             var executeSeconds = 0;
-            while (sentMessageDict.Count != sendSequence || sentMessageDict.Values.Any(w => !w.Item1 && w.Item2.LastException == null))
+            while (sentMessageDict.Count > 0)
             {
                 if (executeSeconds > timeout)
                 {
@@ -283,7 +293,8 @@ namespace Tests.Publisher
                 Thread.Sleep(1000);
                 executeSeconds++;
             }
-            var failList = sentMessageDict.Values.Where(w => !w.Item1).ToList();
+            var failList = sentMessageDict.Values.ToList();
+            Console.WriteLine($"{nameof(TestRpcClient)} send fail count: {failList.Count}, total: {sendSequence}");
         }
     }
 }

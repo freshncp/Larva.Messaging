@@ -149,9 +149,9 @@ namespace Larva.Messaging.RabbitMQ
 
         private void RegisterMessageHandler(Type handlerType, string filteredMessageHandlerCategory)
         {
-            if (handlerType.IsInterface || handlerType.IsAbstract || handlerType.IsGenericType) return;
+            if (handlerType.GetTypeInfo().IsInterface || handlerType.GetTypeInfo().IsAbstract || handlerType.GetTypeInfo().IsGenericType) return;
             var currentHandlerInterfaceTypes = handlerType.GetInterfaces()
-                .Where(m => m.IsGenericType && !m.IsGenericTypeDefinition && m.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
+                .Where(m => m.GetTypeInfo().IsGenericType && !m.GetTypeInfo().IsGenericTypeDefinition && m.GetGenericTypeDefinition() == typeof(IMessageHandler<>))
                 .ToArray();
             var messageHandlerCategory = MessageHandlerTypeAttribute.GetCategory(handlerType);
             if (string.IsNullOrEmpty(filteredMessageHandlerCategory) || messageHandlerCategory == filteredMessageHandlerCategory)
@@ -197,7 +197,7 @@ namespace Larva.Messaging.RabbitMQ
             if (string.IsNullOrEmpty(props.Type))
             {
                 // 如果未传入类型，则以队列名作为类型名
-                if (queueName.StartsWith("rpc."))
+                if (queueName.StartsWith("rpc.", StringComparison.CurrentCulture))
                 {
                     messageTypeName = queueName.Substring(4);
                 }
@@ -221,10 +221,11 @@ namespace Larva.Messaging.RabbitMQ
             {
                 if (_messageTypes.ContainsKey(messageTypeName))
                 {
+                    var messageType = _messageTypes[messageTypeName];
                     object message = null;
                     try
                     {
-                        message = Serializer.Deserialize(body, _messageTypes[messageTypeName]);
+                        message = Serializer.Deserialize(body, messageType);
                     }
                     catch
                     {
@@ -248,11 +249,9 @@ namespace Larva.Messaging.RabbitMQ
                         {
                             try
                             {
-                                messageHandler.GetType().InvokeMember("Handle",
-                                   BindingFlags.InvokeMethod
-                                   | BindingFlags.Public
-                                   | BindingFlags.Instance,
-                                   null, messageHandler, new object[] { message, context });
+                                var handleMethodInfo = messageHandler.GetType().GetTypeInfo().GetMethod("Handle",
+                                   new Type[] { messageType, typeof(IMessageTransportationContext) });
+                                handleMethodInfo.Invoke(messageHandler, new object[] { message, context });
                             }
                             catch (Exception handleEx)
                             {

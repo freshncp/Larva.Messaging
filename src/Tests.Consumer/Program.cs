@@ -7,11 +7,13 @@ namespace Tests.Consumer
     {
         static void Main(string[] args)
         {
+            var tester = new ConsumerTester();
             Parallel.Invoke(
-                () => new ConsumerTester().TestTopic(),
-                () => new ConsumerTester().TestPubsub("test.pubsub.wms"),
-                () => new ConsumerTester().TestPubsub("test.pubsub.erp"),
-                () => new ConsumerTester().TestRpcServer()
+                () => tester.TestTopic(),
+                () => tester.TestPubsub("test.pubsub.wms"),
+                () => tester.TestPubsub("test.pubsub.erp"),
+                () => tester.TestPubsub2(),
+                () => tester.TestRpcServer()
             );
         }
     }

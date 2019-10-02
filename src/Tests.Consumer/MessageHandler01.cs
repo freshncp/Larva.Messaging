@@ -13,20 +13,20 @@ namespace Tests.Consumer
     {
         public void Handle(Message01 message, IMessageTransportationContext context)
         {
-            Thread.Sleep(600);
             if (message.Sequence % 2 == 1) throw new ApplicationException("业务逻辑执行报错");
+            Thread.Sleep(100);
             Console.WriteLine($"Message01 sequence {message.Sequence} from queue {context.QueueName}");
         }
 
         public void Handle(Message02 message, IMessageTransportationContext context)
         {
-            Thread.Sleep(500);
+            Thread.Sleep(200);
             Console.WriteLine($"Message02 from queue {context.QueueName}");
         }
 
         public void Handle(Message03 message, IMessageTransportationContext context)
         {
-            Thread.Sleep(700);
+            Thread.Sleep(300);
             Console.WriteLine($"Message03 from queue {context.QueueName}");
         }
     }

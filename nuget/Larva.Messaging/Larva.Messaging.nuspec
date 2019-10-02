@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>Larva.Messaging</id>
+    <version>1.0.3</version>
+    <title>Larva.Messaging</title>
+    <authors>Jerry Bai (QQ:407547953)</authors>
+    <owners>Jerry Bai (QQ:407547953)</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <license type="expression">MIT</license>
+    <projectUrl>https://github.com/freshncp/Larva.Messaging</projectUrl>
+    <description>基于MQ的消息处理，支持专题模式、发布订阅模式和Rpc模式</description>
+    <summary>基于MQ的消息处理，支持专题模式、发布订阅模式和Rpc模式</summary>
+    <releaseNotes></releaseNotes>
+    <copyright>freshncp</copyright>
+    <language>zh</language>
+    <tags>larva mq messaging</tags>
+    <dependencies>
+      <group targetFramework=".NETStandard1.6">
+        <dependency id="NETStandard.Library" version="1.6.1" exclude="Build,Analyzers" />
+        <dependency id="System.Threading.Thread" version="4.3.0" exclude="Build,Analyzers" />
+        <dependency id="Newtonsoft.Json" version="11.0.2" exclude="Build,Analyzers" />
+      </group>
+      <group targetFramework=".NETStandard2.0">
+        <dependency id="Newtonsoft.Json" version="11.0.2" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>

@@ -21,10 +21,15 @@ namespace Larva.Messaging
         /// <returns></returns>
         public static string GetTypeName(Type messageType)
         {
-            if (messageType.IsInterface || messageType.IsAbstract || messageType.IsGenericType) return string.Empty;
-
-            var messageTypeAttr = messageType.GetCustomAttribute<MessageTypeAttribute>(false);
-            return messageTypeAttr != null && !string.IsNullOrWhiteSpace(messageTypeAttr.TypeName) ? messageTypeAttr.TypeName.Trim() : messageType.FullName;
+            if (messageType.GetTypeInfo().IsInterface
+                || messageType.GetTypeInfo().IsAbstract
+                || messageType.GetTypeInfo().IsGenericType)
+            {
+                return string.Empty;
+            }
+            var messageTypeAttr = messageType.GetTypeInfo().GetCustomAttribute<MessageTypeAttribute>(false);
+            return messageTypeAttr != null && !string.IsNullOrWhiteSpace(messageTypeAttr.TypeName)
+                ? messageTypeAttr.TypeName.Trim() : messageType.FullName;
         }
     }
 }

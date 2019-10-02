@@ -1,29 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <PackOnBuild>true</PackOnBuild>
-    <PackageVersion>1.0.2</PackageVersion>
-    <Authors>Jerry Bai (QQ:407547953)</Authors>
-    <Copyright>freshncp</Copyright>
-    <PackageLicenseUrl>https://github.com/freshncp/Larva.Messaging/blob/master/LICENSE</PackageLicenseUrl>
-    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <Owners>Jerry Bai (QQ:407547953)</Owners>
-    <PackageProjectUrl>https://github.com/freshncp/Larva.Messaging</PackageProjectUrl>
-    <Summary>基于MQ的消息处理，支持专题模式、发布订阅模式和Rpc模式</Summary>
-    <Title>Larva.Messaging</Title>
-    <NeutralLanguage>zh</NeutralLanguage>
-    <PackageTags>larva mq messaging</PackageTags>
-    <Description>基于MQ的消息处理，支持专题模式、发布订阅模式和Rpc模式</Description>
-    <PackageId>Larva.Messaging</PackageId>
-    <ReleaseVersion>1.0.0</ReleaseVersion>
+    <TargetFrameworks>netstandard1.6;netstandard2.0</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
-    <PackageReference Include="NuGet.Build.Packaging" Version="0.2.2">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
+    <PackageReference Include="log4net" Version="2.0.8" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)'=='netstandard1.6'">
+    <PackageReference Include="System.Threading.Thread" Version="4.3.0" />
   </ItemGroup>
 </Project>

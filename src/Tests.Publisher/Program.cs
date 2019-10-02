@@ -6,12 +6,15 @@ namespace Tests.Publisher
     {
         static void Main(string[] args)
         {
-            Parallel.Invoke(
-                () => new PublisherTester().TestTopic(),
-                () => new PublisherTester().TestPubsub(),
-                () => new PublisherTester().TestPubsub2(),
-                () => new PublisherTester().TestRpcClient()
-            );
+            using (var tester = new PublisherTester())
+            {
+                Parallel.Invoke(
+                    () => tester.TestTopic(),
+                    () => tester.TestPubsub(),
+                    () => tester.TestPubsub2(),
+                    () => tester.TestRpcClient()
+                );
+            }
         }
     }
 }

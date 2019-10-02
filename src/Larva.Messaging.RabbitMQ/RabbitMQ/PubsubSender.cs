@@ -19,8 +19,6 @@ namespace Larva.Messaging.RabbitMQ
         private int _maxRetryCount;
         private bool _confirmEnabled;
         private bool _atLeastMatchOneQueue;
-        private bool _publishToExchange;
-        private byte _publishToExchangeQueueCount;
         private bool _debugEnabled;
 
         /// <summary>
@@ -37,23 +35,22 @@ namespace Larva.Messaging.RabbitMQ
         /// <param name="publishToExchangeQueueCount">发布到交换器时的队列数</param>
         /// <param name="debugEnabled">启用调试模式</param>
         public PubsubSender(Connection conn, string exchangeName
-            , IEnumerable<string> subscriberNames = null, ISerializer serializer = null, int maxRetryCount = -1, bool confirmEnabled = false, bool atLeastMatchOneQueue = false
+            , IEnumerable<string> subscriberNames = null, ISerializer serializer = null, int maxRetryCount = 3, bool confirmEnabled = false, bool atLeastMatchOneQueue = false
             , bool publishToExchange = false, byte publishToExchangeQueueCount = 1, bool debugEnabled = false)
-            : base(serializer, debugEnabled)
+            : base(exchangeName, serializer, debugEnabled)
         {
-            if (string.IsNullOrEmpty(exchangeName))
-            {
-                throw new ArgumentNullException("exchangeName", "must not empty");
-            }
-            _conn = conn ?? throw new ArgumentNullException("conn");
+            _conn = conn ?? throw new ArgumentNullException(nameof(conn));
             _maxRetryCount = maxRetryCount < 0 ? 0 : maxRetryCount;
             _confirmEnabled = confirmEnabled;
             _atLeastMatchOneQueue = confirmEnabled || atLeastMatchOneQueue;// 如果启用发送接收应答，则“至少一个匹配的队列”自动开启
-            _publishToExchange = publishToExchange;
-            _publishToExchangeQueueCount = publishToExchangeQueueCount;
+            PublishToExchange = publishToExchange;
+            if (publishToExchange)
+            {
+                PublishToExchangeQueueCount = publishToExchangeQueueCount == 0 ? (byte)1 : publishToExchangeQueueCount;
+            }
             _debugEnabled = debugEnabled;
-            ExchangeName = exchangeName;
-            SubscriberNameQueueOrExchangeNameMapping = subscriberNames == null ? new Dictionary<string, string>() : subscriberNames.ToDictionary(kv => kv, kv => publishToExchange ? $"{exchangeName}.X.{kv}" : $"{exchangeName}.{kv}");
+            SubscriberNameQueueOrExchangeNameMapping = subscriberNames == null ? new Dictionary<string, string>()
+                : subscriberNames.ToDictionary(kv => kv, kv => publishToExchange ? $"{exchangeName}.X.{kv}" : $"{exchangeName}.{kv}");
 
             using (var channelForConfig = _conn.CreateChannel())
             {
@@ -83,11 +80,17 @@ namespace Larva.Messaging.RabbitMQ
             };
             Run();
         }
+        
 
         /// <summary>
-        /// 交换器
+        /// 是否发布到交换机（默认为到队列）
         /// </summary>
-        public string ExchangeName { get; private set; }
+        public bool PublishToExchange { get; private set; }
+
+        /// <summary>
+        /// 发布到交换机的队列数
+        /// </summary>
+        public byte PublishToExchangeQueueCount { get; private set; }
 
         /// <summary>
         /// 订阅者名->队列名或交换器名映射
@@ -97,58 +100,21 @@ namespace Larva.Messaging.RabbitMQ
         /// <summary>
         /// 发送消息
         /// </summary>
-        /// <typeparam name="T"></typeparam>
         /// <param name="message">消息</param>
-        public void SendMessage<T>(T message) where T : class
+        public override void SendMessage<T>(Envelope<T> message)
         {
-            if (message == null) throw new ArgumentNullException("message");
-            Type messageType = message.GetType();
-            if (typeof(Envelope).IsAssignableFrom(messageType))
-            {
-                if (messageType.IsGenericType
-                    && !messageType.IsGenericTypeDefinition
-                    && typeof(Envelope<>) == messageType.GetGenericTypeDefinition())
-                {
-                    var methodInfo = GetType().GetMethods()
-                        .First(m => m.Name == "SendMessage"
-                            && m.IsGenericMethodDefinition
-                            && m.GetParameters()[0].ParameterType.Name == typeof(Envelope<>).Name)
-                        .MakeGenericMethod(messageType.GetGenericArguments()[0]);
-                    try
-                    {
-                        methodInfo.Invoke(this, new object[] { message });
-                    }
-                    catch (Exception ex)
-                    {
-                        var realEx = ex is TargetInvocationException ? ex.InnerException : ex;
-                        throw new TargetInvocationException(realEx.Message, realEx);
-                    }
-                }
-            }
-            else
-            {
-                SendMessage(Envelope.Create(message));
-            }
-        }
-
-        /// <summary>
-        /// 发送消息
-        /// </summary>
-        /// <param name="message">消息</param>
-        public void SendMessage<T>(Envelope<T> message) where T : class
-        {
-            if (message == null || message.Body == null) throw new ArgumentNullException("message");
+            if (message == null || message.Body == null) throw new ArgumentNullException(nameof(message));
             var body = Serializer.Serialize(message.Body);
             var messageTypeName = MessageTypeAttribute.GetTypeName(message.Body.GetType());
             var routingKey = string.Empty;
-            if (_publishToExchange)
+            if (PublishToExchange)
             {
                 uint routingKeyHashCode = 0;
                 if (!uint.TryParse(message.RoutingKey, out routingKeyHashCode))
                 {
                     routingKeyHashCode = (uint)message.RoutingKey.GetHashCode();
                 }
-                routingKey = (routingKeyHashCode % _publishToExchangeQueueCount).ToString();
+                routingKey = (routingKeyHashCode % PublishToExchangeQueueCount).ToString();
             }
             else
             {
@@ -215,8 +181,10 @@ namespace Larva.Messaging.RabbitMQ
             {
                 var realEx = ex is TargetInvocationException ? ex.InnerException : ex;
                 context.LastException = realEx;
-                TriggerOnMessageSendingFailed(new MessageSendingFailedEventArgs(this.GetSenderType(), context));
-                throw new MessageSendFailedException(envelopedMessage, ExchangeName, realEx);
+                if (!TriggerOnMessageSendingFailed(new MessageSendingFailedEventArgs(this.GetSenderType(), context)))
+                {
+                    throw new MessageSendFailedException(envelopedMessage, ExchangeName, realEx);
+                }
             }
             finally
             {

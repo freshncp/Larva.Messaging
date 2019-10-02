@@ -10,26 +10,18 @@ namespace Larva.Messaging
     public interface IPubsubSender : IMessageSender, ISerializerOwner, IDisposable
     {
         /// <summary>
-        /// 交换器
+        /// 是否发布到交换机（默认为到队列）
         /// </summary>
-        string ExchangeName { get; }
+        bool PublishToExchange { get; }
+
+        /// <summary>
+        /// 发布到交换机的队列数
+        /// </summary>
+        byte PublishToExchangeQueueCount { get; }
 
         /// <summary>
         /// 订阅者名->队列名或交换器名映射
         /// </summary>
         IDictionary<string, string> SubscriberNameQueueOrExchangeNameMapping { get; }
-
-        /// <summary>
-        /// 发送消息
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="message">消息</param>
-        void SendMessage<T>(T message) where T : class;
-
-        /// <summary>
-        /// 发送消息
-        /// </summary>
-        /// <param name="message">消息</param>
-        void SendMessage<T>(Envelope<T> message) where T : class;
     }
 }

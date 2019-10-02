@@ -4,7 +4,6 @@ using log4net;
 using RabbitMQ.Client;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 
 namespace Larva.Messaging.RabbitMQ
@@ -32,22 +31,21 @@ namespace Larva.Messaging.RabbitMQ
         /// <param name="sourceExchangeName">源Exchange交换器</param>
         /// <param name="debugEnabled">启用调试模式</param>
         public TopicSender(Connection conn, string exchangeName
-            , byte queueCount = 1, ISerializer serializer = null, int maxRetryCount = -1, bool confirmEnabled = false, string sourceExchangeName = ""
+            , byte queueCount = 1, ISerializer serializer = null, int maxRetryCount = 3, bool confirmEnabled = false, string sourceExchangeName = ""
             , bool debugEnabled = false)
-            : base(serializer, debugEnabled)
+            : base(exchangeName, serializer, debugEnabled)
         {
             if (string.IsNullOrEmpty(exchangeName))
             {
-                throw new ArgumentNullException("exchangeName", "must not empty");
+                throw new ArgumentNullException(nameof(exchangeName), "must not empty");
             }
             if (queueCount <= 0)
             {
-                throw new ArgumentOutOfRangeException("queueCount", "must greate than 0");
+                throw new ArgumentOutOfRangeException(nameof(queueCount), "must greate than 0");
             }
-            _conn = conn ?? throw new ArgumentNullException("conn");
+            _conn = conn ?? throw new ArgumentNullException(nameof(conn));
             _maxRetryCount = maxRetryCount < 0 ? 0 : maxRetryCount;
             _confirmEnabled = confirmEnabled;
-            ExchangeName = exchangeName;
             QueueCount = queueCount;
             _debugEnabled = debugEnabled;
 
@@ -86,11 +84,6 @@ namespace Larva.Messaging.RabbitMQ
         }
 
         /// <summary>
-        /// 交换器
-        /// </summary>
-        public string ExchangeName { get; private set; }
-
-        /// <summary>
         /// 队列数
         /// </summary>
         public byte QueueCount { get; private set; }
@@ -98,47 +91,10 @@ namespace Larva.Messaging.RabbitMQ
         /// <summary>
         /// 发送消息
         /// </summary>
-        /// <typeparam name="T"></typeparam>
         /// <param name="message">消息</param>
-        public void SendMessage<T>(T message) where T : class
+        public override void SendMessage<T>(Envelope<T> message)
         {
-            if (message == null) throw new ArgumentNullException("message");
-            Type messageType = message.GetType();
-            if (typeof(Envelope).IsAssignableFrom(messageType))
-            {
-                if (messageType.IsGenericType
-                    && !messageType.IsGenericTypeDefinition
-                    && typeof(Envelope<>) == messageType.GetGenericTypeDefinition())
-                {
-                    var methodInfo = GetType().GetMethods()
-                        .First(m => m.Name == "SendMessage"
-                            && m.IsGenericMethodDefinition
-                            && m.GetParameters()[0].ParameterType.Name == typeof(Envelope<>).Name)
-                        .MakeGenericMethod(messageType.GetGenericArguments()[0]);
-                    try
-                    {
-                        methodInfo.Invoke(this, new object[] { message });
-                    }
-                    catch (Exception ex)
-                    {
-                        var realEx = ex is TargetInvocationException ? ex.InnerException : ex;
-                        throw new TargetInvocationException(realEx.Message, realEx);
-                    }
-                }
-            }
-            else
-            {
-                SendMessage(Envelope.Create(message));
-            }
-        }
-
-        /// <summary>
-        /// 发送消息
-        /// </summary>
-        /// <param name="message">消息</param>
-        public void SendMessage<T>(Envelope<T> message) where T : class
-        {
-            if (message == null || message.Body == null) throw new ArgumentNullException("message");
+            if (message == null || message.Body == null) throw new ArgumentNullException(nameof(message));
             uint routingKeyHashCode = 0;
             if (!uint.TryParse(message.RoutingKey, out routingKeyHashCode))
             {
@@ -210,8 +166,10 @@ namespace Larva.Messaging.RabbitMQ
             {
                 var realEx = ex is TargetInvocationException ? ex.InnerException : ex;
                 context.LastException = realEx;
-                TriggerOnMessageSendingFailed(new MessageSendingFailedEventArgs(this.GetSenderType(), context));
-                throw new MessageSendFailedException(envelopedMessage, ExchangeName, realEx);
+                if (!TriggerOnMessageSendingFailed(new MessageSendingFailedEventArgs(this.GetSenderType(), context)))
+                {
+                    throw new MessageSendFailedException(envelopedMessage, ExchangeName, realEx);
+                }
             }
             finally
             {

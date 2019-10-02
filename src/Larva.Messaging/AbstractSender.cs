@@ -1,9 +1,11 @@
 ﻿using Larva.Messaging.Serialization;
 using log4net;
 using System;
+using System.Linq;
+using System.Reflection;
 using System.Threading;
 
-namespace Larva.Messaging.RabbitMQ
+namespace Larva.Messaging
 {
     /// <summary>
     /// 发送者抽象类
@@ -18,10 +20,16 @@ namespace Larva.Messaging.RabbitMQ
         /// <summary>
         /// 发送者抽象类
         /// </summary>
+        /// <param name="exchangeName">交换器</param>
         /// <param name="serializer">序列化工具</param>
         /// <param name="debugEnabled">启用调试模式</param>
-        protected AbstractSender(ISerializer serializer, bool debugEnabled)
+        protected AbstractSender(string exchangeName, ISerializer serializer, bool debugEnabled)
         {
+            if (string.IsNullOrEmpty(exchangeName))
+            {
+                throw new ArgumentNullException(nameof(exchangeName), "must not empty");
+            }
+            ExchangeName = exchangeName;
             Serializer = serializer ?? new JsonSerializer();
             _debugEnabled = debugEnabled;
             OnMessageSendingSucceeded += (sender, e) =>
@@ -36,6 +44,11 @@ namespace Larva.Messaging.RabbitMQ
                 _logger.Error($"Message [{e.Context.GetMessageType()}] \"{e.Context.GetPayload()}\" send to \"\", routing key=\"{e.Context.GetRoutingKey()}\", reply to=\"{e.Context.GetReplyTo()}\", correlationId=\"{e.Context.GetCorrelationId()}\" failed.", e.Context.LastException);
             };
         }
+
+        /// <summary>
+        /// 交换器
+        /// </summary>
+        public string ExchangeName { get; private set; }
 
         /// <summary>
         /// 序列化工具
@@ -70,13 +83,22 @@ namespace Larva.Messaging.RabbitMQ
         /// 触发 OnMessageSendingFailed 事件
         /// </summary>
         /// <param name="args"></param>
-        protected void TriggerOnMessageSendingFailed(MessageSendingFailedEventArgs args)
+        protected bool TriggerOnMessageSendingFailed(MessageSendingFailedEventArgs args)
         {
             try
             {
+                if (OnMessageSendingFailed == null)
+                {
+                    throw new Exception("No event handler: OnMessageSendingFailed");
+                }
                 OnMessageSendingFailed?.Invoke(this, args);
+                return true;
             }
-            catch { }
+            catch (Exception onSendMessageFailedEx)
+            {
+                _logger.Error($"Message [\"{args.Context.GetMessageType()}\"] \"{args.Context.GetPayload()}\" send message failed, and event \"{GetType().Name}.OnMessageSendingFailed\" invoke error in exchange \"{args.Context.ExchangeName}\", routingKey={args.Context.GetRoutingKey()}: {onSendMessageFailedEx.Message}.", onSendMessageFailedEx);
+                return false;
+            }
         }
 
         /// <summary>
@@ -156,5 +178,49 @@ namespace Larva.Messaging.RabbitMQ
         {
             return Interlocked.Read(ref _runningState) == 1;
         }
+
+        /// <summary>
+        /// 发送消息
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="message">消息</param>
+		/// <param name="routingKey">路由键</param>
+        public void SendMessage<T>(T message, string routingKey = "") where T : class
+        {
+            if (message == null) throw new ArgumentNullException(nameof(message));
+            Type messageType = message.GetType();
+            if (typeof(Envelope).IsAssignableFrom(messageType))
+            {
+                if (messageType.GetTypeInfo().IsGenericType
+                    && !messageType.GetTypeInfo().IsGenericTypeDefinition
+                    && typeof(Envelope<>) == messageType.GetGenericTypeDefinition())
+                {
+                    var methodInfo = GetType().GetMethods()
+                        .First(m => m.Name == "SendMessage"
+                            && m.IsGenericMethodDefinition
+                            && m.GetParameters()[0].ParameterType.Name == typeof(Envelope<>).Name)
+                        .MakeGenericMethod(messageType.GetGenericArguments()[0]);
+                    try
+                    {
+                        methodInfo.Invoke(this, new object[] { message });
+                    }
+                    catch (Exception ex)
+                    {
+                        var realEx = ex is TargetInvocationException ? ex.InnerException : ex;
+                        throw new TargetInvocationException(realEx.Message, realEx);
+                    }
+                }
+            }
+            else
+            {
+                SendMessage(Envelope.Create(message, routingKey: routingKey));
+            }
+        }
+
+        /// <summary>
+        /// 发送消息
+        /// </summary>
+        /// <param name="message">消息</param>
+        public abstract void SendMessage<T>(Envelope<T> message) where T : class;
     }
 }

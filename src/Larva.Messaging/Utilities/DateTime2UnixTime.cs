@@ -7,7 +7,8 @@ namespace Larva.Messaging.Utilities
     /// </summary>
     public class DateTime2UnixTime
     {
-        private static readonly DateTime _startTime = TimeZoneInfo.ConvertTimeFromUtc(new DateTime(1970, 1, 1), TimeZoneInfo.Local);
+        private static readonly DateTime _startTime = TimeZoneInfo.ConvertTime(new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc), TimeZoneInfo.Local);
+     
         /// <summary>
         /// 将Unix时间戳转换为DateTime类型时间
         /// </summary>

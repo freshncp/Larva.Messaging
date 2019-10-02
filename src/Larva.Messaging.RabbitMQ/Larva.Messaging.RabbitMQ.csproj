@@ -1,46 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <RootNamespace>Larva.Messaging</RootNamespace>
-    <PackOnBuild>true</PackOnBuild>
-    <PackageId>Larva.Messaging.RabbitMQ</PackageId>
-    <Authors>Jerry Bai (QQ:407547953)</Authors>
-    <PackageProjectUrl>https://github.com/freshncp/Larva.Messaging</PackageProjectUrl>
-    <PackageTags>larva mq messaging rabbitmq</PackageTags>
-    <Title>Larva.Messaging.RabbitMQ</Title>
-    <Description>基于RabbitMQ的消息处理，支持专题模式、发布订阅模式和Rpc模式</Description>
-    <PackageVersion>1.0.2</PackageVersion>
-    <NeutralLanguage>zh-CN</NeutralLanguage>
-    <Summary>基于RabbitMQ的消息处理，支持专题模式、发布订阅模式和Rpc模式</Summary>
-    <Owners>Jerry Bai (QQ:407547953)</Owners>
-    <Copyright>freshncp</Copyright>
-    <ReleaseVersion>1.0.0</ReleaseVersion>
-    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <PackageReleaseNotes>### 1.0.0 (更新日期：2019/9/24)
-
-```plain
-1）支持消息路由、顺序消费；
-2）支持部署多台消费端程序（相同Exchange下，一个队列仅允许被一个消费端程序消费；但一个消费端程序可以同时消费多个队列）；
-3）采用Envelope&lt;T&gt;进行消息封装，通过实现接口IMessageHandler&lt;T&gt;进行消息处理；；
-4）消息发送，默认发送到mq失败时会不断重试，也可以通过初始化TopicSender时显式指定重试次数；
-5）同一个队列，如果消息处理失败，则会不断重试，直到显式标记为丢弃消息(通过IMessageHandler.DropMessageOnFailed方法返回true来标记)；
-6）支持专题模式（Topic）、发布订阅模式（Pubsub）和Rpc模式；
-7）发送端和消息端使用的消息类之间解耦，可以通过MessageTypeAttribute对消息类进行消息类型声明，默认为带名字空间的类名；
-8）引入发送和处理的C#事件，方便业务端处理；
-9）消费端消费失败，且OnMessageHandlingFailed事件处理失败时，利用rabbitmq的DLX特性，丢到一个DLX Exchange（使用默认Exchange）中，DLX Exchange发送的队列的命名=Exchange名 + "-dlx"，发布订阅模式需要手工建；
-```</PackageReleaseNotes>
-    <PackageLicenseUrl>https://github.com/freshncp/Larva.Messaging/blob/master/LICENSE</PackageLicenseUrl>
+    <TargetFrameworks>netstandard1.6;netstandard2.0</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="log4net" Version="2.0.8" />
     <PackageReference Include="RabbitMQ.Client" Version="5.0.1" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
-    <PackageReference Include="NuGet.Build.Packaging" Version="0.2.2">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)'=='netstandard1.6'">
+    <PackageReference Include="System.Threading.Thread" Version="4.3.0" />
   </ItemGroup>
   <ItemGroup>
     <Compile Remove="Internals\MessageHandleResponseTypes.cs" />
